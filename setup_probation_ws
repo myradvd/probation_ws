@@ -1,0 +1,8 @@
+#!/bin/bash
+
+docker compose up -d dev-core
+echo " dev core composed"
+echo "beginning execution"
+echo "Tip: Use <ros2 daemon start && ros2 launch probation_bringup probation.launch.py> to launch ROS" 
+docker compose exec dev-core bash
+

@@ -22,6 +22,7 @@ setup(
             'mode_switcher = task.mode_switcher:main',
             'depth_controller = task.depth_controller:main',
             'nav_controller = task.nav_controller:main',
+            'nav_debugger = task.nav_debugger:main',
         ],
     },
 )

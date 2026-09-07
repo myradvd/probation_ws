@@ -34,17 +34,18 @@ def hexagon_vertices(center, radius):
 
 
 class GraphPlanner:
-    # Stores the safety radius (hexagon circumradius) and how far in front of the gate the mini-goal sits
-    def __init__(self, safety_radius: float, approach_distance: float = 2.0):
+    # Stores the safety radius (hexagon circumradius) and how far past the gate the through-point sits
+    def __init__(self, safety_radius: float, through_distance: float = 2.0):
         self.safety_radius = safety_radius
-        self.approach_distance = approach_distance
+        self.through_distance = through_distance
 
-    # Computes the mini-goal point: a fixed distance in front of the gate, along its facing direction
-    def compute_mini_goal(self, gate_position, gate_yaw):
+    # Computes the through-point: a fixed distance PAST the gate, along its facing direction --
+    # aiming here (instead of stopping in front) makes the planned path actually cross the gate
+    def compute_through_point(self, gate_position, gate_yaw):
         fx = math.cos(gate_yaw)
         fy = math.sin(gate_yaw)
         gx, gy = gate_position[0], gate_position[1]
-        return (gx - self.approach_distance * fx, gy - self.approach_distance * fy)
+        return (gx + self.through_distance * fx, gy + self.through_distance * fy)
 
     # Checks whether a straight segment between two points stays outside every obstacle's safety radius
     def is_segment_clear(self, p1, p2, obstacle_positions):
@@ -105,10 +106,10 @@ class GraphPlanner:
         path.reverse()
         return path
 
-    # Top-level planning call: computes the mini-goal, builds the graph, and returns a safe waypoint path
+    # Top-level planning call: computes the through-point, builds the graph, and returns a safe waypoint path
     def plan(self, auv_position, gate_position, gate_yaw, obstacle_positions):
         start = (auv_position[0], auv_position[1])
-        mini_goal = self.compute_mini_goal(gate_position, gate_yaw)
-        nodes, edges = self.build_graph(start, mini_goal, obstacle_positions)
+        through_point = self.compute_through_point(gate_position, gate_yaw)
+        nodes, edges = self.build_graph(start, through_point, obstacle_positions)
         path = self.a_star(nodes, edges)
         return path

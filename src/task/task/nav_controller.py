@@ -7,6 +7,8 @@ import tf2_ros
 from tf2_ros import TransformException
 
 from .graph_planner import GraphPlanner, yaw_from_quaternion
+# The leading dot means "import from this same package" -- this works because
+# graph_planner.py lives right next to this file inside the auv_nav/auv_nav/ folder.
 
 
 class NavControllerNode(Node):
@@ -19,7 +21,14 @@ class NavControllerNode(Node):
             'red_flare/base_link', 'yellow_flare/base_link',
         ])
         self.declare_parameter('safety_radius', 0.75)  # 1.5x AUV width -- SET THIS TO YOUR REAL AUV WIDTH
-        self.declare_parameter('approach_distance', 2.0)
+        self.declare_parameter('obstacle_margin', 0.3)  # extra buffer beyond safety_radius, real tracking isn't perfect
+        self.declare_parameter('flare_frames', [
+            'blue_flare/base_link', 'orange_flare/base_link',
+            'red_flare/base_link', 'yellow_flare/base_link',
+        ])
+        self.declare_parameter('depth_gain', 0.5)
+        self.declare_parameter('max_heave_speed', 0.3)
+        self.declare_parameter('through_distance', 2.0)  # how far PAST the gate the target point sits
         self.declare_parameter('waypoint_tolerance', 0.3)
         self.declare_parameter('position_gain', 0.5)
         self.declare_parameter('yaw_gain', 0.8)
@@ -29,7 +38,11 @@ class NavControllerNode(Node):
 
         self.obstacle_frames = self.get_parameter('obstacle_frames').value
         self.safety_radius = self.get_parameter('safety_radius').value
-        self.approach_distance = self.get_parameter('approach_distance').value
+        self.obstacle_margin = self.get_parameter('obstacle_margin').value
+        self.through_distance = self.get_parameter('through_distance').value
+        self.flare_frames = self.get_parameter('flare_frames').value
+        self.depth_gain = self.get_parameter('depth_gain').value
+        self.max_heave_speed = self.get_parameter('max_heave_speed').value
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').value
         self.position_gain = self.get_parameter('position_gain').value
         self.yaw_gain = self.get_parameter('yaw_gain').value
@@ -42,9 +55,12 @@ class NavControllerNode(Node):
 
         self.cmd_pub = self.create_publisher(Twist, '/mavros/setpoint_velocity/cmd_vel_unstamped', 10)
 
-        self.planner = GraphPlanner(self.safety_radius, self.approach_distance)
+        # Effective avoidance radius includes a margin beyond the theoretical minimum,
+        # since real tracking never follows the planned line exactly
+        self.planner = GraphPlanner(self.safety_radius + self.obstacle_margin, self.through_distance)
         self.path = None
         self.current_waypoint_index = 0
+        self.target_depth = None  # computed once from flare frames, held for the whole crossing
 
         self.timer = self.create_timer(1.0 / control_rate_hz, self.control_loop)
 
@@ -67,6 +83,25 @@ class NavControllerNode(Node):
             if pose is not None:
                 positions.append((pose[0], pose[1]))
         return positions
+
+    # Looks up a frame's z coordinate in the map frame, returns None if not available yet
+    def lookup_z(self, frame_name):
+        try:
+            tf = self.tf_buffer.lookup_transform('map', frame_name, rclpy.time.Time())
+        except TransformException:
+            return None
+        return tf.transform.translation.z
+
+    # Computes and caches the depth to hold during crossing, from the average flare depth
+    def get_target_depth(self):
+        if self.target_depth is not None:
+            return self.target_depth
+        depths = [self.lookup_z(f) for f in self.flare_frames]
+        depths = [d for d in depths if d is not None]
+        if not depths:
+            return None
+        self.target_depth = sum(depths) / len(depths)
+        return self.target_depth
 
     # Computes the waypoint path once, using the planner, from current AUV position to the mini-goal
     def compute_path(self, auv_pose):
@@ -109,7 +144,8 @@ class NavControllerNode(Node):
 
         self.send_velocity_command(auv_x, auv_y, auv_yaw, target[0], target[1])
 
-    # Converts a map-frame position error into a body-frame P-controller velocity command, with a safety buffer
+    # Converts a map-frame position error into a body-frame P-controller velocity command, with a safety buffer.
+    # Also holds depth (linear.z) so buoyancy drift doesn't carry the AUV into a flare vertically.
     def send_velocity_command(self, auv_x, auv_y, auv_yaw, target_x, target_y):
         dx = target_x - auv_x
         dy = target_y - auv_y
@@ -126,6 +162,14 @@ class NavControllerNode(Node):
         msg.linear.x = max(min(local_x * self.position_gain, self.max_linear_speed), -self.max_linear_speed)
         msg.linear.y = max(min(local_y * self.position_gain, self.max_linear_speed), -self.max_linear_speed)
         msg.angular.z = max(min(yaw_error * self.yaw_gain, self.max_yaw_rate), -self.max_yaw_rate)
+
+        target_depth = self.get_target_depth()
+        auv_z = self.lookup_z('auv/base_link')
+        if target_depth is not None and auv_z is not None:
+            depth_error = target_depth - auv_z
+            heave = depth_error * self.depth_gain
+            msg.linear.z = max(min(heave, self.max_heave_speed), -self.max_heave_speed)
+
         self.cmd_pub.publish(msg)
 
 

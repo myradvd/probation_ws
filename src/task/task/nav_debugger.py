@@ -310,9 +310,14 @@ class NavigationDebugger(Node):
             ax.set_ylim(y_min, y_max)
     
     def show(self):
-        """Display the plot interactively"""
-        plt.show()
-
+        """Save plots continuously"""
+        import time
+        while rclpy.ok():
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"/tmp/nav_debugger_{timestamp}.png"
+            self.fig.savefig(filename, dpi=150, bbox_inches='tight')
+            self.get_logger().info(f'Plot saved to {filename}')
+            time.sleep(2.0)  # Save every 2 seconds
 
 def main(args=None):
     rclpy.init(args=args)

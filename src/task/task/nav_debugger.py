@@ -310,6 +310,7 @@ class NavigationDebugger(Node):
             ax.set_ylim(y_min, y_max)
     
     def show(self):
+<<<<<<< HEAD
         """Save plots continuously"""
         import time
         while rclpy.ok():
@@ -318,6 +319,11 @@ class NavigationDebugger(Node):
             self.fig.savefig(filename, dpi=150, bbox_inches='tight')
             self.get_logger().info(f'Plot saved to {filename}')
             time.sleep(2.0)  # Save every 2 seconds
+=======
+        """Display the plot interactively"""
+        plt.show()
+
+>>>>>>> fc6372f (navigation+debugging suite)
 
 def main(args=None):
     rclpy.init(args=args)

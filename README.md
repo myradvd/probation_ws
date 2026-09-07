@@ -43,7 +43,7 @@ probation_ws/
 │   ├── probation_bringup/              # Launch, config, and your solution scripts
 │   │   ├── launch/
 │   │   │   └── probation.launch.py     # <-- Main launch file for the simulation
-│   │   └── scripts/
+│   │   └── probation_bringup/
 │   │       └── solution_template.py    # <-- Start here: implement your solution
 │   └── vision/
 │       └── vision_msgs/                # Custom message definitions for bounding boxes
@@ -56,6 +56,12 @@ Start the container (once) and enter it (every time you open a new Ubuntu termin
 cd ~/probation_ws
 docker compose up -d dev-core
 docker compose exec dev-core bash
+```
+
+Build the workspace and source the overlay (first time, and after any code changes):
+```bash
+colcon build --symlink-install
+source install/setup.bash
 ```
 
 ### Step 1 — Launch the ROS2 Bridge
@@ -98,9 +104,9 @@ Then run:
 ros2 run probation_bringup solution_template.py
 ```
 
-> **Tip:** If you create new Python scripts in `src/probation_bringup/scripts/`, ensure they have executable permissions:
+> **Tip:** If you create new Python scripts in `src/probation_bringup/probation_bringup/`, ensure they have executable permissions:
 > ```bash
-> chmod +x src/probation_bringup/scripts/<script_name>.py
+> chmod +x src/probation_bringup/probation_bringup/<script_name>.py
 > ```
 
 ## 5. Available Topics
@@ -155,7 +161,7 @@ angular.z — yaw left/CCW (+) / right/CW (−)[rad/s]
 
 ## 7. Where to Start
 
-Open [`src/probation_bringup/scripts/solution_template.py`](src/probation_bringup/scripts/solution_template.py).
+Open [`src/probation_bringup/probation_bringup/solution_template.py`](src/probation_bringup/probation_bringup/solution_template.py).
 
 It contains a clean ROS2 node skeleton to start building your solution.
 

@@ -92,5 +92,6 @@
         "variant": "cpp",
         "core": "cpp"
     },
-    "cmake.sourceDirectory": "/home/bgiabao/workshop_ws/src/workshop_main"
+    "cmake.sourceDirectory": "/home/bgiabao/workshop_ws/src/workshop_main",
+    "remote.autoForwardPortsFallback": 0
 }
